@@ -1,0 +1,15 @@
+version: "3"
+services:
+  mariadb:
+    image: mariadb:10.5.1
+    container_name: mariadb-server-golang-retail
+    volumes:
+      - ./db_mysql:/var/lib/mysql
+#    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: retail
+      MYSQL_USER: golang
+      MYSQL_PASSWORD: password
+      MYSQL_DATABASE: retail_db
+    ports:
+      - "6001:3306"
