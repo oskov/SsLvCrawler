@@ -1,5 +1,5 @@
 #!/bin/bash
 
-docker-compsoe up
+docker-compose up
 
 docker stop mariadb-server-golang-retail
