@@ -67,7 +67,7 @@ func main() {
 	}
 
 	crawler.Run(job)
-	//crawler.flatStorage.Save(db)
-	//logSuccess(db, mode)
+	crawler.flatStorage.Save(db)
+	logSuccess(db, mode)
 	db.Close()
 }

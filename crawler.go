@@ -7,7 +7,6 @@ import (
 	"github.com/retailerTool/utils"
 	"strconv"
 	"strings"
-	"time"
 )
 
 var (
@@ -24,11 +23,11 @@ type Job struct {
 
 var (
 	Sell = Job{
-		url:     "https://www.ss.lv/ru/real-estate/flats/riga/today/sell/",
+		url:     "https://www.ss.lv/ru/real-estate/flats/riga/all/sell/",
 		jobType: "sell",
 	}
 	Rent = Job{
-		url:     "https://www.ss.lv/ru/real-estate/flats/riga/today/hand_over/",
+		url:     "https://www.ss.lv/ru/real-estate/flats/riga/all/hand_over/",
 		jobType: "rent",
 	}
 )
@@ -87,10 +86,15 @@ func (c *Crawler) Run(job Job) {
 		c.flatStorage.Put(flat)
 	})
 
+	visitedUrls := make([]string, 50)
+
 	c.collector.OnHTML("a[name]", func(element *colly.HTMLElement) {
-		time.Sleep(100 * time.Millisecond)
-		c.logger.Log("Visit " + element.Request.AbsoluteURL(element.Attr("href")))
-		c.collector.Visit(element.Request.AbsoluteURL(element.Attr("href")))
+		url := element.Request.AbsoluteURL(element.Attr("href"))
+		if !utils.IsStringInSlice(visitedUrls, url) {
+			visitedUrls = append(visitedUrls, url)
+			c.logger.Log("Visit " + url)
+			c.collector.Visit(url)
+		}
 	})
 
 	c.collector.Visit(job.url)
