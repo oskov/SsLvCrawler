@@ -38,23 +38,6 @@ const (
 	Today5 Interval = "today-5"
 )
 
-type Job struct {
-	url     string
-	jobType string
-	lang    string
-}
-
-var (
-	Sell = Job{
-		url:     "https://www.ss.lv/ru/real-estate/flats/riga/all/sell/",
-		jobType: "sell",
-	}
-	Rent = Job{
-		url:     "https://www.ss.lv/ru/real-estate/flats/riga/all/hand_over/",
-		jobType: "rent",
-	}
-)
-
 const BaseUrl = "https://www.ss.lv/"
 
 type Command struct {
