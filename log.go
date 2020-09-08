@@ -16,3 +16,11 @@ func (ConsoleLogger) Log(string string) {
 func (ConsoleLogger) LogData(data interface{}) {
 	fmt.Println(data)
 }
+
+type StubLogger struct{}
+
+func (StubLogger) Log(string string) {
+}
+
+func (StubLogger) LogData(data interface{}) {
+}

@@ -29,6 +29,8 @@ const (
 
 type City string
 
+const RigaCity = City("Riga")
+
 type Interval string
 
 const (

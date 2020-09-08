@@ -22,7 +22,7 @@ type Flat struct {
 
 type FlatStorage interface {
 	Put(flat Flat) bool
-	Get() (flat Flat)
+	GetAll() (flats []Flat)
 	ToSql() (sql string, sqlParams []interface{})
 	Save(db *sql.DB)
 }
@@ -40,10 +40,8 @@ func (f *flatStorage) Put(flat Flat) bool {
 	return true
 }
 
-func (f *flatStorage) Get() (flat Flat) {
-	flat = f.flats[0]
-	f.flats = f.flats[1:]
-	return flat
+func (f *flatStorage) GetAll() []Flat {
+	return f.flats
 }
 
 func (f *flatStorage) ToSql() (sql string, sqlParams []interface{}) {
