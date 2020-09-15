@@ -1,7 +1,8 @@
-package main
+package crawlerPackage
 
 import (
 	"github.com/gocolly/colly"
+	"github.com/retailerTool/util"
 	"strconv"
 	"strings"
 )
@@ -13,11 +14,14 @@ const (
 	Firefox UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:62.0) Gecko/20100101 Firefox/62.0"
 )
 
-type JobType string
+type JobType struct {
+	Url    string
+	DbType string
+}
 
-const (
-	SellJob JobType = "sell"
-	RentJob JobType = "hand_over"
+var (
+	SellJob JobType = JobType{"sell", "sell"}
+	RentJob JobType = JobType{"hand_over", "rent"}
 )
 
 type JobLang string
@@ -32,6 +36,20 @@ type City string
 const RigaCity = City("Riga")
 
 type Interval string
+
+func getIntervalFromDays(days int) Interval {
+	switch days {
+	case 0:
+		return Today
+	case 1:
+		return Today2
+	case 2:
+	case 3:
+	case 4:
+		return Today5
+	}
+	return All
+}
 
 const (
 	All    Interval = "all"
@@ -50,6 +68,26 @@ type Command struct {
 	Interval  Interval
 }
 
+func GetDefaultRigaRuRentJob(days int) Command {
+	return Command{
+		UserAgent: Firefox,
+		JobType:   RentJob,
+		Lang:      Ru,
+		City:      RigaCity,
+		Interval:  getIntervalFromDays(days),
+	}
+}
+
+func GetDefaultRigaRuSellJob(days int) Command {
+	return Command{
+		UserAgent: Firefox,
+		JobType:   SellJob,
+		Lang:      Ru,
+		City:      RigaCity,
+		Interval:  getIntervalFromDays(days),
+	}
+}
+
 func (c *Command) ConstructUrl() string {
 	return BaseUrl +
 		string(c.Lang) +
@@ -58,12 +96,12 @@ func (c *Command) ConstructUrl() string {
 		"/" +
 		string(c.Interval) +
 		"/" +
-		string(c.JobType) +
+		c.JobType.Url +
 		"/"
 }
 
 type Crawler struct {
-	logger    Logger
+	Logger    util.Logger
 	collector *colly.Collector
 }
 
@@ -85,11 +123,11 @@ func (c *Crawler) RunCommand(command Command) FlatStorage {
 		}
 		flat := Flat{}
 		flat.Id, _ = strconv.Atoi(rowElement.Attr("id")[3:])
-		flat.Type = string(command.JobType)
+		flat.Type = command.JobType.DbType
 		rowElement.ForEach("td", func(i int, cellElement *colly.HTMLElement) {
 			switch i {
 			case 2:
-				flat.Text = FilterChars(cellElement.Text, "[\n]")
+				flat.Text = util.FilterChars(cellElement.Text, "[\n]")
 				cellElement.ForEach("a[href]", func(i int, element *colly.HTMLElement) {
 					flat.Url = element.Request.AbsoluteURL(element.Attr("href"))
 				})
@@ -108,9 +146,9 @@ func (c *Crawler) RunCommand(command Command) FlatStorage {
 			case 7:
 				flat.HouseType = cellElement.Text
 			case 8:
-				flat.Price, _ = strconv.Atoi(FilterChars(cellElement.Text, "[^0-9]"))
+				flat.Price, _ = strconv.Atoi(util.FilterChars(cellElement.Text, "[^0-9]"))
 			case 9:
-				flat.Price, _ = strconv.Atoi(FilterChars(cellElement.Text, "[^0-9]"))
+				flat.Price, _ = strconv.Atoi(util.FilterChars(cellElement.Text, "[^0-9]"))
 			}
 		})
 		flatStorage.Put(flat)
@@ -120,11 +158,11 @@ func (c *Crawler) RunCommand(command Command) FlatStorage {
 
 	c.collector.OnHTML("a[name]", func(element *colly.HTMLElement) {
 		url := element.Request.AbsoluteURL(element.Attr("href"))
-		if !IsStringInSlice(visitedUrls, url) {
+		if !util.IsStringInSlice(visitedUrls, url) {
 			visitedUrls = append(visitedUrls, url)
-			c.logger.Log("Visit " + url)
+			c.Logger.Log("Visit " + url)
 			if err := c.collector.Visit(url); err != nil {
-				c.logger.Log(err.Error())
+				c.Logger.Log(err.Error())
 			}
 		}
 	})
@@ -132,10 +170,10 @@ func (c *Crawler) RunCommand(command Command) FlatStorage {
 	url := command.ConstructUrl()
 	visitedUrls = append(visitedUrls, url)
 
-	c.logger.Log("Initial url: " + url)
+	c.Logger.Log("Initial url: " + url)
 
 	if err := c.collector.Visit(url); err != nil {
-		c.logger.Log(err.Error())
+		c.Logger.Log(err.Error())
 	}
 
 	return flatStorage

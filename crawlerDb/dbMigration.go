@@ -1,4 +1,4 @@
-package main
+package crawlerDb
 
 import (
 	"database/sql"
@@ -54,6 +54,18 @@ var (
 			Version:     1.5,
 			Description: "Add added_dt column",
 			Script:      `ALTER TABLE flats ADD COLUMN added_dt DATETIME;`,
+		},
+		{
+			Version:     1.6,
+			Description: "Add tgUsers",
+			Script: `CREATE TABLE tgUsers(
+						id 				INT AUTO_INCREMENT, 
+						tg_id			INT
+						json_value 		LONGTEXT,
+						active 			BOOLEAN DEFAULT TRUE,
+						PRIMARY KEY (id)
+						UNIQUE KEY (tg_id)
+					) ENGINE=InnoDB CHARACTER SET=utf8;`,
 		},
 	}
 )

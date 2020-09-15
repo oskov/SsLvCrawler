@@ -1,6 +1,9 @@
-package main
+package util
 
-import "fmt"
+import (
+	"database/sql"
+	"fmt"
+)
 
 type Logger interface {
 	Log(string string)
@@ -23,4 +26,8 @@ func (StubLogger) Log(string string) {
 }
 
 func (StubLogger) LogData(data interface{}) {
+}
+
+type DbLogger struct {
+	Db *sql.DB
 }

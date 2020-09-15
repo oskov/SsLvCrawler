@@ -1,8 +1,9 @@
-package main
+package crawlerPackage
 
 import (
-	"database/sql"
 	"fmt"
+	"github.com/jmoiron/sqlx"
+	"github.com/retailerTool/util"
 	"os"
 )
 
@@ -24,7 +25,7 @@ type FlatStorage interface {
 	Put(flat Flat) bool
 	GetAll() (flats []Flat)
 	ToSql() (sql string, sqlParams []interface{})
-	Save(db *sql.DB)
+	Save(db *sqlx.DB)
 }
 
 type flatStorage struct {
@@ -33,6 +34,11 @@ type flatStorage struct {
 
 func NewFlatStorage() FlatStorage {
 	return &flatStorage{flats: make([]Flat, 0)}
+}
+
+//TODO fix this shit code
+func NewFlatStorageFromFlats(flats []Flat) FlatStorage {
+	return &flatStorage{flats: flats}
 }
 
 func (f *flatStorage) Put(flat Flat) bool {
@@ -73,14 +79,14 @@ func (f *flatStorage) ToSql() (sql string, sqlParams []interface{}) {
 			v.Price,
 			v.Type,
 			v.Url,
-			CurrentDateTime()}
+			util.CurrentDateTime()}
 		sqlParams = append(sqlParams, flat...)
 	}
 	sql = sql[:len(sql)-1] + ";"
 	return sql, sqlParams
 }
 
-func (f *flatStorage) Save(db *sql.DB) {
+func (f *flatStorage) Save(db *sqlx.DB) {
 	if len(f.flats) == 0 {
 		return
 	}

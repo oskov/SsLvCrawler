@@ -4,31 +4,25 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
+	"github.com/retailerTool/config"
+	"github.com/retailerTool/crawlerDb"
+	"github.com/retailerTool/crawlerPackage"
+	"github.com/retailerTool/util"
 	"os"
 	"strings"
 )
-import _ "github.com/go-sql-driver/mysql"
 
-var dbConfig = mysql.Config{
-	User:                 os.Getenv("dbUser"),
-	Passwd:               os.Getenv("dbPass"),
-	Net:                  "tcp",
-	Addr:                 os.Getenv("dbAddr"), // localhost:6001
-	DBName:               os.Getenv("dbName"),
-	AllowNativePasswords: true,
-}
-
-func logSuccess(db *sql.DB, mode string) {
+func logSuccess(db *sqlx.DB, mode string) {
 	sqlQuery := "INSERT INTO logs (type, log_dt, error) VALUES (?,?,?)"
 	statement, _ := db.Prepare(sqlQuery)
-	_, _ = statement.Exec(mode, CurrentDateTime(), nil)
+	_, _ = statement.Exec(mode, util.CurrentDateTime(), nil)
 }
 
 type applicationArgs struct {
 	debug      bool
 	logActions bool
-	jobType    JobType
+	jobType    crawlerPackage.JobType
 	city       string
 	interval   string
 	lang       string
@@ -54,12 +48,12 @@ func createApplicationArgs(args []string) (*applicationArgs, error) {
 	}
 
 	firstArg := args[0]
-	var job JobType
+	var job crawlerPackage.JobType
 	switch firstArg {
 	case "sell":
-		job = SellJob
+		job = crawlerPackage.SellJob
 	case "rent":
-		job = RentJob
+		job = crawlerPackage.RentJob
 	default:
 		printHelp()
 		os.Exit(0)
@@ -101,50 +95,51 @@ func createApplicationArgs(args []string) (*applicationArgs, error) {
 	return appArgs, nil
 }
 
-func initDb() *sql.DB {
-	db, err := sql.Open("mysql", dbConfig.FormatDSN())
+func initDb() *sqlx.DB {
+	db, err := sql.Open("mysql", config.DbConfig.FormatDSN())
 	if err != nil {
 		fmt.Println("Unable to open mysql connection")
 		os.Exit(-1)
 	}
-	err = RunMigrations(db)
+	err = crawlerDb.RunMigrations(db)
 	if err != nil {
 		fmt.Println("Unable to make migrations")
 		fmt.Println(err)
 		os.Exit(-1)
 	}
-	return db
+	sqlxDb := sqlx.NewDb(db, "mysql")
+	return sqlxDb
 }
 
 func runWithAppArgs(args *applicationArgs) {
-	var db *sql.DB
+	var db *sqlx.DB
 	if !args.debug {
 		db = initDb()
 	}
 
-	var logger Logger
+	var logger util.Logger
 	if args.logActions {
-		logger = ConsoleLogger{}
+		logger = util.ConsoleLogger{}
 	} else {
-		logger = StubLogger{}
+		logger = util.StubLogger{}
 	}
 
-	crawler := Crawler{
-		logger: logger,
+	crawler := crawlerPackage.Crawler{
+		Logger: logger,
 	}
-	command := Command{
-		UserAgent: Firefox,
+	command := crawlerPackage.Command{
+		UserAgent: crawlerPackage.Firefox,
 		JobType:   args.jobType,
-		Lang:      JobLang(args.lang),
-		City:      City(args.city),
-		Interval:  Interval(args.interval),
+		Lang:      crawlerPackage.JobLang(args.lang),
+		City:      crawlerPackage.City(args.city),
+		Interval:  crawlerPackage.Interval(args.interval),
 	}
 
 	flatStorage := crawler.RunCommand(command)
 
 	if !args.debug {
 		flatStorage.Save(db)
-		logSuccess(db, string(args.jobType))
+		logSuccess(db, args.jobType.DbType)
 		db.Close()
 	} else {
 		fmt.Println(flatStorage.GetAll())

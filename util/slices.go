@@ -1,4 +1,4 @@
-package main
+package util
 
 func IsStringInSlice(a []string, x string) bool {
 	for _, n := range a {
