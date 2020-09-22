@@ -6,10 +6,16 @@ services:
     volumes:
       - ./db_mysql:/var/lib/mysql
 #    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: retail
-      MYSQL_USER: golang
-      MYSQL_PASSWORD: password
-      MYSQL_DATABASE: retail_db
+    env_file:
+      - app.env
     ports:
       - "6001:3306"
+  app:
+    build: ./
+    container_name: ss-crawler-golang
+    env_file:
+      - app.env
+    depends_on:
+      - mariadb
+    links:
+      - mariadb

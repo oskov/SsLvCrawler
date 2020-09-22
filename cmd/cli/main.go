@@ -13,12 +13,6 @@ import (
 	"strings"
 )
 
-func logSuccess(db *sqlx.DB, mode string) {
-	sqlQuery := "INSERT INTO logs (type, log_dt, error) VALUES (?,?,?)"
-	statement, _ := db.Prepare(sqlQuery)
-	_, _ = statement.Exec(mode, util.CurrentDateTime(), nil)
-}
-
 type applicationArgs struct {
 	debug      bool
 	logActions bool
@@ -139,7 +133,7 @@ func runWithAppArgs(args *applicationArgs) {
 
 	if !args.debug {
 		flatStorage.Save(db)
-		logSuccess(db, args.jobType.DbType)
+		util.LogSuccess(db, args.jobType.DbType)
 		db.Close()
 	} else {
 		fmt.Println(flatStorage.GetAll())

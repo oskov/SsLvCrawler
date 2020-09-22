@@ -6,11 +6,12 @@ import (
 )
 
 var DbConfig = mysql.Config{
-	User:                 os.Getenv("dbUser"),
-	Passwd:               os.Getenv("dbPass"),
+	User:                 os.Getenv("MYSQL_USER"),
+	Passwd:               os.Getenv("MYSQL_PASSWORD"),
 	Net:                  "tcp",
-	Addr:                 os.Getenv("dbAddr"), // localhost:6001
-	DBName:               os.Getenv("dbName"),
+	Addr:                 os.Getenv("MYSQL_ADDR"), // localhost:6001
+	DBName:               os.Getenv("MYSQL_DATABASE"),
 	AllowNativePasswords: true,
 	ParseTime:            true,
+	CheckConnLiveness:    true,
 }

@@ -1,8 +1,8 @@
 package util
 
 import (
-	"database/sql"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 )
 
 type Logger interface {
@@ -29,5 +29,14 @@ func (StubLogger) LogData(data interface{}) {
 }
 
 type DbLogger struct {
-	Db *sql.DB
+	Db *sqlx.DB
+}
+
+func LogSuccess(db *sqlx.DB, mode string) {
+	sqlQuery := "INSERT INTO logs (type, log_dt, error) VALUES (?,?,?)"
+	statement, _ := db.Prepare(sqlQuery)
+	_, err := statement.Exec(mode, CurrentDateTime(), nil)
+	if err != nil {
+		fmt.Println(err)
+	}
 }

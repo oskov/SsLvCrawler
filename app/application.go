@@ -59,7 +59,8 @@ func (storage *tgUserStorage) getUserById(id int) *tgUser {
 				Districts: []string{},
 				Type:      "rent",
 			},
-			tgId: id,
+			tgId:   id,
+			sender: nil,
 		})
 	}
 	return user
@@ -106,6 +107,11 @@ type tgUser struct {
 	sender *tb.User
 }
 
+type tgUserDb struct {
+	JsonParams string `db:"json_value"`
+	TgId       int    `db:"tg_id"`
+}
+
 func (context *ApplicationContext) deleteTgUser(id int) {
 	_, _ = context.Db.Exec("DELETE FROM tgUsers WHERE tg_id = ?;", id)
 }
@@ -125,6 +131,8 @@ func (context *ApplicationContext) saveTgUser(user tgUser) {
 }
 
 func (job *crawlerJob) run(ch chan<- []crawlerPackage.Flat) {
+	fmt.Println("Run command: ")
+	fmt.Println(job.command)
 	flatStorage := job.crawler.RunCommand(job.command)
 	ch <- flatStorage.GetAll()
 }
@@ -154,22 +162,92 @@ func (context *ApplicationContext) createSellJob() *crawlerJob {
 }
 
 func (context *ApplicationContext) RunApplication() {
+	context.getDb()
+	defer func() {
+		if context.Db != nil {
+			fmt.Println("close db")
+			context.Db.Close()
+		}
+	}()
+
+	ticketPingDb := time.NewTicker(30 * time.Second)
+
+	go func() {
+		for t := range ticketPingDb.C {
+			_ = t
+
+			fmt.Println("ping db")
+			err := context.Db.Ping()
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}()
+
+	fmt.Println("load saved users")
+
+	users := []tgUserDb{}
+	err := context.Db.Select(&users, "SELECT tg_id, json_value FROM tgUsers")
+
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(-1)
+	}
+
+	for _, v := range users {
+		var tgParams TgUserParams
+		err := json.Unmarshal([]byte(v.JsonParams), &tgParams)
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(-1)
+		}
+		context.users.saveUser(tgUser{
+			params: tgParams,
+			tgId:   v.TgId,
+			sender: &tb.User{
+				ID:              v.TgId,
+				FirstName:       "",
+				LastName:        "",
+				Username:        "",
+				LanguageCode:    "",
+				IsBot:           false,
+				CanJoinGroups:   false,
+				CanReadMessages: false,
+				SupportsInline:  false,
+			},
+		})
+	}
+
+	fmt.Println("saved users loaded: ")
+	for _, v := range context.users.tgUsers {
+		fmt.Println(v)
+	}
+
 	ch := make(chan []crawlerPackage.Flat)
 
 	tickerScan := time.NewTicker(10 * time.Minute)
 	go func() {
 		for t := range tickerScan.C {
 			_ = t
-			go context.createRentJob().run(ch)
-			go context.createSellJob().run(ch)
+			fmt.Println("run jobs")
+			go func() {
+				context.createRentJob().run(ch)
+				util.LogSuccess(context.Db, "rent")
+			}()
+			go func() {
+				context.createSellJob().run(ch)
+				util.LogSuccess(context.Db, "sell")
+			}()
 		}
 	}()
 
-	tickerUsers := time.NewTicker(5 * time.Minute)
+	tickerUsers := time.NewTicker(1 * time.Minute)
 
 	go func() {
 		for t := range tickerUsers.C {
 			_ = t
+
+			fmt.Println("save users")
 			for _, v := range context.users.tgUsers {
 				context.saveTgUser(*v) //TODO write normal SQL to save users with single query
 			}
@@ -180,7 +258,7 @@ func (context *ApplicationContext) RunApplication() {
 		Token:  os.Getenv("BOT_TOKEN"),
 		Poller: &tb.LongPoller{Timeout: 30 * time.Second},
 	})
-
+	fmt.Println("create tg bot")
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)
@@ -195,45 +273,57 @@ func (context *ApplicationContext) RunApplication() {
 	}
 
 	go func() {
-		flats := <-ch
-		//TODO fix this shit code
-		go func() {
-			crawlerPackage.NewFlatStorageFromFlats(flats).Save(context.Db)
-		}()
-		validUsers := []tgUser{}
-		validFlats := []crawlerPackage.Flat{}
-		// filter bad users
-		for _, v := range context.users.tgUsers {
-			if v.params.Districts != nil {
-				validUsers = append(validUsers, *v)
+		for flats := range ch {
+			validUsers := []tgUser{}
+			validFlats := []crawlerPackage.Flat{}
+			// filter bad users
+			for _, v := range context.users.tgUsers {
+				if v.params.Districts != nil {
+					validUsers = append(validUsers, *v)
+				}
 			}
-		}
-		// filter flats that not useful for us
-		for _, vf := range flats {
-			for _, vu := range validUsers {
-				if vu.params.Price.Min < vf.Price && vu.params.Price.Max > vf.Price {
-					if vu.params.Districts[0] == vf.District {
-						if vu.params.Type == vf.Type { // rent or sell
-							validFlats = append(validFlats, vf)
-							break
+			// filter flats that not useful for us
+			for _, vf := range flats {
+				for _, vu := range validUsers {
+					if vu.params.Price.Min < vf.Price && vu.params.Price.Max > vf.Price {
+						if vu.params.Districts[0] == vf.District {
+							if vu.params.Type == vf.Type { // rent or sell
+								validFlats = append(validFlats, vf)
+								break
+							}
 						}
 					}
 				}
 			}
-		}
-
-		for _, vu := range validUsers {
-			userFlats := []crawlerPackage.Flat{}
-			for _, vf := range validFlats {
-				if vu.params.Price.Min < vf.Price && vu.params.Price.Max > vf.Price {
-					if vu.params.Districts[0] == vf.District {
-						userFlats = append(userFlats, vf)
+			fmt.Println("Valid flats: " + strconv.Itoa(len(validFlats)))
+			fmt.Println("Valid users: " + strconv.Itoa(len(validUsers)))
+			for _, vu := range validUsers {
+				userFlats := []crawlerPackage.Flat{}
+				for _, vf := range validFlats {
+					if vu.params.Price.Min < vf.Price && vu.params.Price.Max > vf.Price {
+						if vu.params.Districts[0] == vf.District {
+							if vu.params.Type == vf.Type {
+								userFlats = append(userFlats, vf)
+							}
+						}
+					}
+				}
+				for _, flat := range userFlats {
+					var row int
+					res := context.Db.QueryRowx("SELECT id_external FROM flats WHERE id_external = ?", flat.Id)
+					err = res.Scan(&row)
+					if row == 0 {
+						fmt.Println("Send flat to  users: " + prettyFlatPrint(flat))
+						bot.Send(vu.sender, prettyFlatPrint(flat))
 					}
 				}
 			}
-			for _, flat := range userFlats {
-				bot.Send(vu.sender, prettyFlatPrint(flat))
-			}
+			//TODO fix this shit code
+			flats := flats
+			go func() {
+				fmt.Println("Save flats")
+				crawlerPackage.NewFlatStorageFromFlats(flats).Save(context.Db)
+			}()
 		}
 	}()
 
@@ -313,6 +403,18 @@ func (context *ApplicationContext) RunApplication() {
 		bot.Send(m.Sender, "Please make sure that district name is correct according to SS.lv ru cite")
 	})
 
+	bot.Handle("/type", func(m *tb.Message) {
+		if !m.Private() {
+			return
+		}
+		id := getUserIdFromMsg(m)
+		user := context.users.getUserById(id)
+		user.params.Districts = []string{m.Payload}
+		user.sender = m.Sender
+		bot.Send(m.Sender, "Your scan district is : "+m.Payload)
+	})
+
+	fmt.Println("start tg bot")
 	bot.Start()
 }
 

@@ -60,10 +60,10 @@ var (
 			Description: "Add tgUsers",
 			Script: `CREATE TABLE tgUsers(
 						id 				INT AUTO_INCREMENT, 
-						tg_id			INT
+						tg_id			INT,
 						json_value 		LONGTEXT,
 						active 			BOOLEAN DEFAULT TRUE,
-						PRIMARY KEY (id)
+						PRIMARY KEY (id),
 						UNIQUE KEY (tg_id)
 					) ENGINE=InnoDB CHARACTER SET=utf8;`,
 		},
