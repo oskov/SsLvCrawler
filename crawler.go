@@ -4,6 +4,7 @@ import (
 	"github.com/gocolly/colly"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type UserAgent string
@@ -75,6 +76,12 @@ func (c *Crawler) RunCommand(command Command) FlatStorage {
 		colly.AllowedDomains("www.ss.lv"),
 	)
 
+	c.collector.Limit(&colly.LimitRule{
+		DomainGlob:  "*ss.lv*",
+		Parallelism: 1,
+		RandomDelay: 1 * time.Second,
+	})
+
 	c.collector.OnHTML("tr[id]", func(rowElement *colly.HTMLElement) {
 		idStr := rowElement.Attr("id")
 		if !strings.HasPrefix(idStr, "tr_") {
@@ -84,8 +91,14 @@ func (c *Crawler) RunCommand(command Command) FlatStorage {
 			return
 		}
 		flat := Flat{}
+		flat.City = string(command.City)
 		flat.Id, _ = strconv.Atoi(rowElement.Attr("id")[3:])
-		flat.Type = string(command.JobType)
+		// ugly fix :)
+		if command.JobType == RentJob {
+			flat.Type = "rent"
+		} else {
+			flat.Type = string(command.JobType)
+		}
 		rowElement.ForEach("td", func(i int, cellElement *colly.HTMLElement) {
 			switch i {
 			case 2:
@@ -98,7 +111,12 @@ func (c *Crawler) RunCommand(command Command) FlatStorage {
 				locationText = strings.ReplaceAll(locationText, "<b>", "")
 				locationText = strings.ReplaceAll(locationText, "</b>", "")
 				locationArr := strings.Split(locationText, "<br/>")
-				flat.District, flat.Street = locationArr[0], locationArr[1]
+				// street is not actual for some cities
+				if len(locationArr) == 2 {
+					flat.District, flat.Street = locationArr[0], locationArr[1]
+				} else {
+					flat.District = locationText
+				}
 			case 4:
 				flat.Rooms, _ = strconv.Atoi(cellElement.Text)
 			case 5:

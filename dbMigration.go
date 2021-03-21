@@ -55,6 +55,11 @@ var (
 			Description: "Add added_dt column",
 			Script:      `ALTER TABLE flats ADD COLUMN added_dt DATETIME;`,
 		},
+		{
+			Version:     1.6,
+			Description: "Add city column",
+			Script:      `ALTER TABLE flats ADD COLUMN city VARCHAR(255) AFTER text;`,
+		},
 	}
 )
 

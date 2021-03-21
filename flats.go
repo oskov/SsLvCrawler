@@ -9,6 +9,7 @@ import (
 type Flat struct {
 	Id            int
 	Text          string
+	City          string
 	District      string
 	Street        string
 	Rooms         int
@@ -48,6 +49,7 @@ func (f *flatStorage) ToSql() (sql string, sqlParams []interface{}) {
 	sql = "INSERT IGNORE INTO flats (" +
 		"id_external, " +
 		"text, " +
+		"city, " +
 		"district, " +
 		"street, " +
 		"rooms, " +
@@ -60,10 +62,11 @@ func (f *flatStorage) ToSql() (sql string, sqlParams []interface{}) {
 		"added_dt) VALUES"
 	sqlParams = make([]interface{}, 0)
 	for _, v := range f.flats {
-		sql = sql + "(?, ?, ? ,? ,? ,? ,? ,? , ?, ?, ?, ?),"
+		sql = sql + "(?, ?, ? ,? ,? ,? ,? ,? , ?, ?, ?, ?, ?),"
 		flat := []interface{}{
 			v.Id,
 			v.Text,
+			v.City,
 			v.District,
 			v.Street,
 			v.Rooms,
